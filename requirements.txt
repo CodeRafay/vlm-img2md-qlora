@@ -1,0 +1,6 @@
+streamlit
+torch
+transformers
+peft
+pillow
+qwen-vl-utils
