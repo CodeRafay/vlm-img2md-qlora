@@ -1,8 +1,24 @@
+import os
 import streamlit as st
 import torch
 from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
 from PIL import Image
 from qwen_vl_utils import process_vision_info
+
+# ── HuggingFace authentication ────────────────────────────────────────────────
+# On Streamlit Cloud: add HF_TOKEN under Settings → Secrets.
+# Locally: set the HF_TOKEN environment variable.
+HF_TOKEN = st.secrets.get("HF_TOKEN", None) or os.environ.get("HF_TOKEN", None)
+if HF_TOKEN:
+    os.environ["HF_TOKEN"] = HF_TOKEN          # picked up by huggingface_hub
+    from huggingface_hub import login
+    login(token=HF_TOKEN, add_to_git_credential=False)
+else:
+    st.warning(
+        "⚠️ No HF_TOKEN found. Downloads may be rate-limited or fail. "
+        "Add your token under Streamlit Cloud → Settings → Secrets as `HF_TOKEN`."
+    )
+# ─────────────────────────────────────────────────────────────────────────────
 
 # Streamlit App Configuration
 st.set_page_config(page_title="VLM Markdown Generator", layout="wide")
@@ -17,19 +33,20 @@ def load_model():
     Loads the fine-tuned Qwen2-VL model and processor. 
     Uses @st.cache_resource to load only once per session.
     """
-    processor = AutoProcessor.from_pretrained(ADAPTER_REPO)
+    processor = AutoProcessor.from_pretrained(ADAPTER_REPO, token=HF_TOKEN)
 
     # 1. Load the original base model
     base_model_id = "Qwen/Qwen2-VL-2B-Instruct"
     base_model = Qwen2VLForConditionalGeneration.from_pretrained(
         base_model_id,
         torch_dtype=torch.bfloat16,
-        device_map="auto"
+        device_map="auto",
+        token=HF_TOKEN
     )
 
     # 2. Apply the LoRA adapter weights on top of the base model
     from peft import PeftModel
-    model = PeftModel.from_pretrained(base_model, ADAPTER_REPO)
+    model = PeftModel.from_pretrained(base_model, ADAPTER_REPO, token=HF_TOKEN)
     model.eval()
 
     return processor, model
